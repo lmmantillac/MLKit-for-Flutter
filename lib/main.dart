@@ -61,34 +61,57 @@ class _MyHomePageState extends State<MyHomePage> {
         });
   }
 
-  Widget _analizeImage() {
-    return FutureBuilder<File>(
-        future: _imageFile,
-        builder: (BuildContext context, AsyncSnapshot<File> snapshot) {
-          if (snapshot.connectionState == ConnectionState.done &&
-              snapshot.data != null) {
-            //in this place we start to analize the data
-            faceCheck();
-            return Image.file(snapshot.data);
-          } else if (snapshot.error != null) {
-            return const Text(
-              'No se analizo ninguna imagen',
-              textAlign: TextAlign.center,
-            );
-          } else {
-            return const Text(
-              'No se analizo ninguna imagen',
-              textAlign: TextAlign.center,
-            );
-          }
-        });
+  Widget _extractLabels() {
+
+    var futureBuilder = new FutureBuilder(
+      future: getLabels(),
+      builder: (BuildContext context, AsyncSnapshot snapshot) {
+        switch (snapshot.connectionState) {
+          case ConnectionState.none:
+          case ConnectionState.waiting:
+            return new Text('waiting...');
+          default:
+            if (snapshot.hasError)
+              return new Text('Error: ${snapshot.error}');
+            else
+              return createListView(context, snapshot);
+        }
+      },
+    );
+
+    return futureBuilder;
   }
 
-  Future<String> faceCheck() async{
-    print("Paso 1");
+  Widget createListView(BuildContext context, AsyncSnapshot snapshot) {
+    List<Label> values = snapshot.data;
+    return new Expanded(
+      child:
+      new ListView.builder(
+      itemCount: values.length,
+      itemBuilder: (BuildContext context, int index) {
+        return Padding(
+            key: ValueKey(values[index]),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.lightBlue),
+              borderRadius: BorderRadius.circular(5.0),
+            ),
+            child: ListTile(
+              title: Text(values[index].label),
+              trailing: Text(values[index].confidence.toString()),
+            )
+          )
+        );
+      },
+    )
+    );
+  }
+
+  Future<List<Label>> getLabels() async{
+    var values = new List<Label>();
     if(_imageFile!=null){
       final File imageFile = await _imageFile;
-      print("Paso 2");
       final FirebaseVisionImage visionImage = FirebaseVisionImage.fromFile(imageFile);
       final LabelDetector labelDetector = FirebaseVision.instance.labelDetector();
       final LabelDetector detector = FirebaseVision.instance.labelDetector(
@@ -100,12 +123,11 @@ class _MyHomePageState extends State<MyHomePage> {
         final String text = label.label;
         final String entityId = label.entityId;
         final double confidence = label.confidence;
-        print("Resultados:::" + text);
       }
+      return labels;
     }
-    return "Bisa";
+    return values;
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +142,7 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Column(
               children: <Widget>[
                 _previewImage(),
-                _analizeImage()
+                _extractLabels()
               ]
           ),
         ),
